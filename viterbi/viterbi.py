@@ -5,6 +5,7 @@ import numpy as np
 import Bbox
 import os
 import sys
+import argparse
 def assertnone(bboxes_list):
     for i,bboxes in enumerate(bboxes_list):
         c=0
@@ -55,10 +56,21 @@ def gettracklets(bboxes_list,cls):
             break
     return tracklets
 
+def parse_arg():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('input',help='the path of dir which contains processing videos')
+    parser.add_argument('output',help='the path of dir which save processed videos')
+    return parser
 if __name__ == "__main__":
-    for l in os.listdir('../../representative_bbox_pickle_output/'):
+    parser=parse_arg()
+    args=parser.parse_args()
+    if os.path.exists(args.output):
+        pass
+    else:
+        os.mkdir(args.output)
+    for l in os.listdir(args.input):
         l=l.split('.')[0]
-        with open('../../representative_bbox_pickle_output/{}.pickle'.format(l),'rb') as file:
+        with open(os.path.join(args.input,'{}.pickle'.format(l)),'rb') as file:
             bboxes_list=pickle.load(file)
         bboxes_list,cls= preprocess(bboxes_list)
         tracklets=gettracklets(bboxes_list,cls)
@@ -69,7 +81,7 @@ if __name__ == "__main__":
         video_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                   int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 
-        writer = cv2.VideoWriter('../representative_test/processed_{}.mp4'.format(l), video_FourCC, video_fps, video_size)
+        writer = cv2.VideoWriter(os.path.join(args.output,'processed_{}.mp4'.format(l)), video_FourCC, video_fps, video_size)
         _,_=cap.read()
         frame_index=0
         while(True):
@@ -83,7 +95,7 @@ if __name__ == "__main__":
                         continue
                     else:
                         top,left,bottom,right=tuple(map(int,bbox.box))
-                        txt='cls:{} s:{}, m:{}'.format('chimp' if bbox.cls==0 else 'gorilla',bbox.score,bbox.motion)
+                        txt='cls:{} s:{:.2f}, m:{:.2f}'.format('chimp' if bbox.cls==0 else 'gorilla',bbox.score,bbox.motion)
                         cv2.rectangle(frame,(left,top),(right,bottom),color,3)
                         cv2.putText(frame,txt,(left,top),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.70, color=color, thickness=2)
                 writer.write(frame)
