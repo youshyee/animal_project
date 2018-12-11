@@ -266,3 +266,4 @@ events.out.*
 # 3D Images
 *.3dm
 *.max
+*.pickle
