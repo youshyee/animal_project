@@ -14,9 +14,9 @@ from yolo3.utils import get_random_data
 
 
 def _main():
-    annotation_path = 'train.txt'
+    annotation_path = 'model_data/asserted_data.txt'
     log_dir = 'logs/000/'
-    classes_path = 'model_data/coco_classes.txt'
+    classes_path = './model_data/my_classes.txt'
     anchors_path = 'model_data/yolo_anchors.txt'
     class_names = get_classes(classes_path)
     num_classes = len(class_names)
@@ -33,10 +33,10 @@ def _main():
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, verbose=1)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
 
-    val_split = 0.1
+    val_split = 0.2
     with open(annotation_path) as f:
         lines = f.readlines()
-    np.random.seed(10101)
+    np.random.seed(10231)
     np.random.shuffle(lines)
     np.random.seed(None)
     num_val = int(len(lines)*val_split)
@@ -59,7 +59,7 @@ def _main():
         bottlenecks_val=[dict_bot["bot0"][num_train:], dict_bot["bot1"][num_train:], dict_bot["bot2"][num_train:]]
 
         # train last layers with fixed bottleneck features
-        batch_size=8
+        batch_size=16
         print("Training last layers with bottleneck features")
         print('with {} samples, val on {} samples and batch size {}.'.format(num_train, num_val, batch_size))
         last_layer_model.compile(optimizer='adam', loss={'yolo_loss': lambda y_true, y_pred: y_pred})
@@ -68,14 +68,14 @@ def _main():
                 validation_data=bottleneck_generator(lines[num_train:], batch_size, input_shape, anchors, num_classes, bottlenecks_val),
                 validation_steps=max(1, num_val//batch_size),
                 epochs=30,
-                initial_epoch=0, max_queue_size=1)
+                initial_epoch=0, max_queue_size=1,workers=25,use_multiprocessing=True)
         model.save_weights(log_dir + 'trained_weights_stage_0.h5')
         
         # train last layers with random augmented data
         model.compile(optimizer=Adam(lr=1e-3), loss={
             # use custom yolo_loss Lambda layer.
             'yolo_loss': lambda y_true, y_pred: y_pred})
-        batch_size = 16
+        batch_size = 32
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         model.fit_generator(data_generator_wrapper(lines[:num_train], batch_size, input_shape, anchors, num_classes),
                 steps_per_epoch=max(1, num_train//batch_size),
@@ -83,7 +83,7 @@ def _main():
                 validation_steps=max(1, num_val//batch_size),
                 epochs=50,
                 initial_epoch=0,
-                callbacks=[logging, checkpoint])
+                callbacks=[logging, checkpoint],workers=25,use_multiprocessing=True)
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
 
     # Unfreeze and continue training, to fine-tune.
@@ -94,7 +94,7 @@ def _main():
         model.compile(optimizer=Adam(lr=1e-4), loss={'yolo_loss': lambda y_true, y_pred: y_pred}) # recompile to apply the change
         print('Unfreeze all of the layers.')
 
-        batch_size = 4 # note that more GPU memory is required after unfreezing the body
+        batch_size = 8 # note that more GPU memory is required after unfreezing the body
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         model.fit_generator(data_generator_wrapper(lines[:num_train], batch_size, input_shape, anchors, num_classes),
             steps_per_epoch=max(1, num_train//batch_size),
@@ -102,7 +102,7 @@ def _main():
             validation_steps=max(1, num_val//batch_size),
             epochs=100,
             initial_epoch=50,
-            callbacks=[logging, checkpoint, reduce_lr, early_stopping])
+            callbacks=[logging, checkpoint, reduce_lr, early_stopping],workers=25,use_multiprocessing=True)
         model.save_weights(log_dir + 'trained_weights_final.h5')
 
     # Further training if needed.
