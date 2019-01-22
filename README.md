@@ -8,5 +8,5 @@
 ### 6 Tubelets nonmaximum suppression.
 
 ## TO DO LIST
-### 1 Robust to occluded and blurred frames for animal detection by aggreating temporal feature into YOLO feature
-### 2 
+### 1 Robust to blurred frames for animal detection by aggreating temporal feature into YOLO feature
+### 2 Robust to occluded frames for animal detection by applying a feature map which can estimate the occlussion parts by the optical flow 
